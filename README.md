@@ -13,16 +13,28 @@ $ go get github.com/dstgo/filebox
 
 ## 压缩操作
 
-* Zip 以zip格式压缩指定文件或目录
+* **Zip** 以zip格式压缩指定文件或目录
 
     ```go
     func Zip(src, dest string) error
     ```
     
-* UnZip 解压zip格式的压缩包
+* **UnZip** 解压zip压缩格式的压缩包
 
     ```go
     func Unzip(src, dest string) error
+    ```
+
+* **Tar** 以tar格式压缩指定文件或目录
+
+    ```go
+    func Tar(src, dest string) error
+    ```
+
+* UnTar 解压tar压缩格式的压缩包
+
+    ```go
+    func UnTar(src, dest string) error
     ```
 ## 路径操作
 
