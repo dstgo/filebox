@@ -31,14 +31,62 @@ $ go get github.com/dstgo/filebox
     func Tar(src, dest string) error
     ```
 
-* UnTar 解压tar压缩格式的压缩包
+* **UnTar** 解压tar压缩格式的压缩包
 
     ```go
     func UnTar(src, dest string) error
     ```
 ## 路径操作
 
+- **GetCurrentRunningPath** 获取当前程序运行的绝对路径
+
+    ```go
+    func GetCurrentRunningPath() string
+    ```
+
+- **GetCurrentCallerPath** 获取当前调用者的文件路径
+
+    ```go
+    func GetCurrentCallerPath() string
+    ```
+
+    
+
 ## 文件操作
 
+- **CreateFile** 检查文件的父目录是否存在，并创建文件
+
+    ```go
+    func CreateFile(file string) (*os.File, error)
+    ```
+
+- **CopyDir** 复制源目录到目标目录
+
+    ```go
+    func CopyDir(src, dst string) error
+    ```
+
+- **CopyFile** 复制源文件到目标文件
+
+    ```go
+    func CopyFile(src, dst string) error
+    ```
+
+    
+
 ## 目录操作
+
+- **Mkdir** 创建一个或多个目录，不会检查父目录
+
+    ```go
+    func Mkdir(dirs ...string) error 
+    ```
+
+- **MkdirAll** 创建一个或多个目录，会检查父目录
+
+    ```go
+    func MkdirAll(dirs ...string) error
+    ```
+
+    
 

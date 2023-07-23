@@ -106,10 +106,20 @@ func CopyFsFile(srcFs ReadFs, dstFs WriteFs, src, dst string) error {
 	return nil
 }
 
+// CopyDir
+// param src string 源路径
+// param dst string 目标路径
+// return error
+// 将源路径的目录复制到目标路径
 func CopyDir(src, dst string) error {
 	return CopyFsDir(Os, Os, src, dst)
 }
 
+// CopyFile
+// param src string
+// param dst string
+// return error
+// 将源路径的文件复制到目标路径
 func CopyFile(src, dst string) error {
 	return CopyFsFile(Os, Os, src, dst)
 }
