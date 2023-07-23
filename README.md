@@ -3,6 +3,14 @@
 
 
 
+##  安装
+
+```sh
+$ go get github.com/dstgo/filebox
+```
+
+
+
 ## 压缩操作
 
 * Zip 以zip格式压缩指定文件或目录
