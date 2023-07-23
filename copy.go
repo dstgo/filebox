@@ -30,7 +30,7 @@ type WriteFs interface {
 	CreateFile(name string) (RwFile, error)
 }
 
-var Os OsFs
+var Os = new(OsFs)
 
 type OsFs struct {
 }
@@ -63,7 +63,7 @@ func (s *OsFs) Open(name string) (fs.File, error) {
 	return os.Open(name)
 }
 
-func CopyDir(srcFS ReadFs, dstFs WriteFs, src, dst string) error {
+func CopyFsDir(srcFS ReadFs, dstFs WriteFs, src, dst string) error {
 	dir, err := srcFS.ReadDir(src)
 	if err != nil {
 		return err
@@ -76,9 +76,9 @@ func CopyDir(srcFS ReadFs, dstFs WriteFs, src, dst string) error {
 		srcPath := path.Join(src, entry.Name())
 		var copyErr error
 		if entry.IsDir() {
-			copyErr = CopyDir(srcFS, dstFs, srcPath, dstPath)
+			copyErr = CopyFsDir(srcFS, dstFs, srcPath, dstPath)
 		} else {
-			copyErr = CopyFile(srcFS, dstFs, srcPath, dstPath)
+			copyErr = CopyFsFile(srcFS, dstFs, srcPath, dstPath)
 		}
 
 		if copyErr != nil {
@@ -88,7 +88,7 @@ func CopyDir(srcFS ReadFs, dstFs WriteFs, src, dst string) error {
 	return nil
 }
 
-func CopyFile(srcFs ReadFs, dstFs WriteFs, src, dst string) error {
+func CopyFsFile(srcFs ReadFs, dstFs WriteFs, src, dst string) error {
 	srcFile, err := srcFs.Open(src)
 	if err != nil {
 		return err
@@ -104,4 +104,12 @@ func CopyFile(srcFs ReadFs, dstFs WriteFs, src, dst string) error {
 	}
 
 	return nil
+}
+
+func CopyDir(src, dst string) error {
+	return CopyFsDir(Os, Os, src, dst)
+}
+
+func CopyFile(src, dst string) error {
+	return CopyFsFile(Os, Os, src, dst)
 }
