@@ -60,13 +60,13 @@ $ go get github.com/dstgo/filebox
     func CreateFile(file string) (*os.File, error)
     ```
 
-- **CopyDir** 复制源目录到目标目录
+- **CopyDir** 复制源目录到目标目录，如果存在则覆盖
 
     ```go
     func CopyDir(src, dst string) error
     ```
 
-- **CopyFile** 复制源文件到目标文件
+- **CopyFile** 复制源文件到目标文件，如果存在则覆盖
 
     ```go
     func CopyFile(src, dst string) error
