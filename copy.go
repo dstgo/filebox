@@ -7,6 +7,11 @@ import (
 	"path"
 )
 
+var (
+	// DefaultBuffer 8KB
+	DefaultBuffer = make([]byte, 1024*1024*8)
+)
+
 type RwFile interface {
 	fs.File
 	io.ReadWriteCloser
@@ -36,7 +41,7 @@ type OsFs struct {
 }
 
 func (s *OsFs) CreateFile(name string) (RwFile, error) {
-	return os.OpenFile(name, os.O_RDWR|os.O_CREATE, 0666)
+	return CreateFile(name)
 }
 
 func (s *OsFs) Mkdir(name string) error {
@@ -63,7 +68,7 @@ func (s *OsFs) Open(name string) (fs.File, error) {
 	return os.Open(name)
 }
 
-func CopyFsDir(srcFS ReadFs, dstFs WriteFs, src, dst string) error {
+func CopyFsDir(srcFS ReadFs, dstFs WriteFs, src, dst string, buffer []byte) error {
 	dir, err := srcFS.ReadDir(src)
 	if err != nil {
 		return err
@@ -76,9 +81,9 @@ func CopyFsDir(srcFS ReadFs, dstFs WriteFs, src, dst string) error {
 		srcPath := path.Join(src, entry.Name())
 		var copyErr error
 		if entry.IsDir() {
-			copyErr = CopyFsDir(srcFS, dstFs, srcPath, dstPath)
+			copyErr = CopyFsDir(srcFS, dstFs, srcPath, dstPath, buffer)
 		} else {
-			copyErr = CopyFsFile(srcFS, dstFs, srcPath, dstPath)
+			copyErr = CopyFsFile(srcFS, dstFs, srcPath, dstPath, buffer)
 		}
 
 		if copyErr != nil {
@@ -88,17 +93,19 @@ func CopyFsDir(srcFS ReadFs, dstFs WriteFs, src, dst string) error {
 	return nil
 }
 
-func CopyFsFile(srcFs ReadFs, dstFs WriteFs, src, dst string) error {
+func CopyFsFile(srcFs ReadFs, dstFs WriteFs, src, dst string, buffer []byte) error {
 	srcFile, err := srcFs.Open(src)
 	if err != nil {
 		return err
 	}
+	defer srcFile.Close()
 	dstFile, err := dstFs.CreateFile(dst)
 	if err != nil {
 		return err
 	}
+	defer dstFile.Close()
 
-	_, err = io.Copy(dstFile, srcFile)
+	_, err = io.CopyBuffer(dstFile, srcFile, buffer)
 	if err != nil {
 		return err
 	}
@@ -112,7 +119,7 @@ func CopyFsFile(srcFs ReadFs, dstFs WriteFs, src, dst string) error {
 // return error
 // 将源路径的目录复制到目标路径
 func CopyDir(src, dst string) error {
-	return CopyFsDir(Os, Os, src, dst)
+	return CopyDirBuf(src, dst, DefaultBuffer)
 }
 
 // CopyFile
@@ -121,5 +128,13 @@ func CopyDir(src, dst string) error {
 // return error
 // 将源路径的文件复制到目标路径
 func CopyFile(src, dst string) error {
-	return CopyFsFile(Os, Os, src, dst)
+	return CopyFileBuf(src, dst, DefaultBuffer)
+}
+
+func CopyDirBuf(src, dst string, buf []byte) error {
+	return CopyFsDir(Os, Os, src, dst, buf)
+}
+
+func CopyFileBuf(src, dst string, buf []byte) error {
+	return CopyFsFile(Os, Os, src, dst, buf)
 }

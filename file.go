@@ -1,10 +1,35 @@
 package filebox
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path"
 )
+
+func OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	return os.OpenFile(name, flag, perm)
+}
+
+func OpenFileReader(file string) (*os.File, error) {
+	return OpenFile(file, os.O_RDONLY, 0)
+}
+
+func OpenFileWriter(file string) (*os.File, error) {
+	if file, err := CreateFile(file); err != nil {
+		return file, err
+	}
+	return OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+}
+
+func OpenFileRw(file string) (*os.File, error) {
+	if file, err := CreateFile(file); err != nil {
+		return file, err
+	}
+	return OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+}
 
 // CreateFile
 // param file string
@@ -22,6 +47,26 @@ func CreateFile(file string) (*os.File, error) {
 	return os.Create(file)
 }
 
+// CreateTempFile
+// param dir string
+// param pattern string
+// return rm func() error 删除临时文件
+// return err error
+// 创建一个临时文件
+func CreateTempFile(dir, pattern string) (file *os.File, rm func() error, err error) {
+	tempFile, err := os.CreateTemp(dir, pattern)
+	rm = func() error {
+		if err == nil {
+			return os.Remove(tempFile.Name())
+		}
+		return err
+	}
+	if err != nil {
+		return tempFile, rm, err
+	}
+	return tempFile, rm, nil
+}
+
 // IsExist
 // param file string
 // return bool
@@ -34,4 +79,72 @@ func IsExist(file string) bool {
 		return false
 	}
 	return true
+}
+
+// ReadFileBytes
+// param file string
+// return []byte
+// return error
+// 从文件里面读取字节切片
+func ReadFileBytes(file string) ([]byte, error) {
+	return os.ReadFile(file)
+}
+
+// ReadFileString
+// param file string
+// return string
+// return error
+// 从文件里面读取字符串
+func ReadFileString(file string) (string, error) {
+	bc, err := ReadFileBytes(file)
+	if err != nil {
+		return "", err
+	}
+	return string(bc), nil
+}
+
+// ReadFileLines
+// param file string
+// return []string
+// return error
+// 按行读取文件内容
+func ReadFileLines(file string) ([]string, error) {
+
+	f, err := os.Open(file)
+	defer f.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	reader := bufio.NewReader(f)
+
+	lines := make([]string, 0, reader.Size()/30)
+	// 行缓冲
+	bufline := bytes.NewBuffer(make([]byte, 0, 4096))
+
+	for {
+		// 如果当前行大于缓冲区，一次读不完，则尝试多次读取，直到读取完毕
+		for {
+			line, prefix, err := reader.ReadLine()
+			if err != nil {
+				// 文件读完了
+				if errors.Is(err, io.EOF) {
+					return lines, nil
+				}
+				return nil, err
+			}
+			// 将读取到的当前行内容写入缓冲
+			if _, err := bufline.Write(line); err != nil {
+				return nil, err
+			}
+
+			// 当前行读取完毕就退出循环
+			if !prefix {
+				break
+			}
+		}
+
+		lines = append(lines, bufline.String())
+		bufline.Reset()
+	}
 }
