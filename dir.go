@@ -1,6 +1,9 @@
 package filebox
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 // Mkdir
 // param dirs ...string
@@ -26,4 +29,46 @@ func MkdirAll(dirs ...string) error {
 		}
 	}
 	return nil
+}
+
+// IsDir 判断是否是目录
+func IsDir(path string) bool {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return fileInfo.IsDir()
+}
+
+func ListDirNames(dirPath string) []string {
+	return listNames(dirPath, true)
+}
+func ListFileNames(dirPath string) []string {
+	return listNames(dirPath, false)
+}
+func listNames(dirPath string, IsReturnDirs bool) []string {
+	fileNames := make([]string, 0)
+
+	dir, err := os.Open(dirPath)
+	if err != nil {
+		return fileNames
+	}
+	defer func(dir *os.File) {
+		err := dir.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(dir)
+	files, err := dir.Readdir(-1)
+	if err != nil {
+		return fileNames
+	}
+
+	for _, file := range files {
+		if file.IsDir() == IsReturnDirs {
+			fileNames = append(fileNames, file.Name())
+		}
+	}
+
+	return fileNames
 }

@@ -72,7 +72,11 @@ $ go get github.com/dstgo/filebox
     func CopyFile(src, dst string) error
     ```
 
+- **ClearFile** 清空文件内容
     
+  ```go
+  func ClearFile(path string) error 
+  ```
 
 ## 目录操作
 
@@ -88,5 +92,21 @@ $ go get github.com/dstgo/filebox
     func MkdirAll(dirs ...string) error
     ```
 
+- **IsDir** 判断是否是目录
+
+    ```go
+    func IsDir(path string) bool
+    ```
+
+- **ListDirNames** 返回所有目录名
+
+    ```go
+    func ListDirNames(dirPath string) []string 
+    ```
+- **ListFileNames** 返回所有文件名
+
+    ```go
+    func ListDirNames(dirPath string) []string 
+    ```
     
 

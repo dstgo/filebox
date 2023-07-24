@@ -2,6 +2,7 @@ package filebox
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 )
@@ -34,4 +35,38 @@ func IsExist(file string) bool {
 		return false
 	}
 	return true
+}
+
+// ClearFile 清空一个文件
+func ClearFile(path string) error {
+	if IsDir(path) {
+		return errors.New("the path file is not a single file")
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		return err
+	}
+	defer func(file *os.File) {
+		err := CloseFile(file)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(file)
+	if err = file.Truncate(0); err != nil {
+		return err
+	}
+	return nil
+}
+
+// CloseFile 关闭文件并处理任何可能出现的错误
+func CloseFile(file *os.File) error {
+	if file == nil {
+		return nil
+	}
+	if err := file.Close(); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
 }
