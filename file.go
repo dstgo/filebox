@@ -52,7 +52,7 @@ func CreateFile(file string) (*os.File, error) {
 // param pattern string
 // return rm func() error 删除临时文件
 // return err error
-// 创建一个临时文件
+// 创建一个临时文件，并返回一个函数以删除这个临时文件
 func CreateTempFile(dir, pattern string) (file *os.File, rm func() error, err error) {
 	tempFile, err := os.CreateTemp(dir, pattern)
 	rm = func() error {
