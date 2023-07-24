@@ -10,13 +10,17 @@ import (
 	"path/filepath"
 )
 
+var (
+	NotRegularFile = errors.New("not regular file")
+)
+
 // Zip
 // param src string
 // param dest string
 // return error
 // 以zip格式压缩文件，压缩文件时，仅保留输入路径的相对文件结构
 func Zip(src, dest string) error {
-	return ZipWith(src, dest, RelZipWalker(true), ZipHeader())
+	return ZipWith(src, dest, RelZipWalker(), ZipHeader())
 }
 
 // AppendToZip
@@ -25,76 +29,133 @@ func Zip(src, dest string) error {
 // return error
 // 将额外的文件或目录添加到现有的压缩文件中，
 func AppendToZip(zipPath string, sources ...string) error {
-	return AppendToZipWith(RelZipWalker(false), ZipHeader(), zipPath, sources...)
+	return AppendToZipWith(OutLayerWalker(), ZipHeader(), zipPath, sources...)
+}
+
+// Unzip
+// param src string
+// param dest string
+// return error
+// 解压zip文件到指定位置
+func Unzip(src, dest string) error {
+	zipReader, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer zipReader.Close()
+	return unzip(zipReader, dest)
 }
 
 type ZipWalkInfo struct {
-	Src      string
-	WalkPath string
-	FileInfo fs.FileInfo
-	Err      error
+	SrcPath      string
+	WalkPath     string
+	SrcFileInfo  fs.FileInfo
+	WalkFileInfo fs.FileInfo
+	Err          error
 }
 
 // Ziper 决定了用何种方式将源文件的内容写入到压缩文件中
-type Ziper func(zipWriter *zip.Writer, fileHeader *zip.FileHeader, fileReader io.Reader) error
+type Ziper func(zipWriter *zip.Writer, fileHeader *zip.FileHeader, fileReader io.Reader, fileInfo fs.FileInfo) error
 
 func ZipHeader() Ziper {
-	return func(zipWriter *zip.Writer, fileHeader *zip.FileHeader, fileReader io.Reader) error {
+	return func(zipWriter *zip.Writer, fileHeader *zip.FileHeader, fileReader io.Reader, fileInfo fs.FileInfo) error {
+		// 写入压缩文件头
 		zipFile, err := zipWriter.CreateHeader(fileHeader)
 		if err != nil {
 			return err
 		}
-		if _, err := io.CopyBuffer(zipFile, fileReader, DefaultBuffer); err != nil {
-			return err
+		// 如果是文件的话就copy
+		if !fileInfo.IsDir() {
+			if _, err := io.CopyBuffer(zipFile, fileReader, DefaultBuffer); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
 }
 
-// ZipWalker 决定了用何种方式去遍历源文件以及如何处理压缩信息
+// ZipWalker 决定了用何种方式如何处理压缩信息
 // 压缩时，会对输入路径执行 filepath.Walk，walkerFn会在每一次walk时调用
 // 通过walker可以自定义压缩方式
-type ZipWalker func(walkInfo *ZipWalkInfo, zipWriter *zip.Writer, zipFn Ziper) error
+type ZipWalker func(walkInfo *ZipWalkInfo, zipWriter *zip.Writer, zipFn Ziper) (*zip.FileHeader, error)
 
-func RelZipWalker(rel bool) ZipWalker {
-	return func(walkInfo *ZipWalkInfo, zipWriter *zip.Writer, ziper Ziper) error {
+// RelZipWalker 只会保留相对SrcPath的文件结构，用于直接压缩文件或目录
+func RelZipWalker() ZipWalker {
+	return func(walkInfo *ZipWalkInfo, zipWriter *zip.Writer, zipFn Ziper) (*zip.FileHeader, error) {
 		if walkInfo.Err != nil {
-			return walkInfo.Err
+			return nil, walkInfo.Err
 		}
-		if !walkInfo.FileInfo.IsDir() {
-			// 创建压缩文件信息头
-			fileHeader, err := zip.FileInfoHeader(walkInfo.FileInfo)
-			if err != nil {
-				return err
-			}
 
-			fileHeader.Name = walkInfo.WalkPath
-			if rel {
-				rel, err := filepath.Rel(walkInfo.Src, walkInfo.WalkPath)
-				if err != nil {
-					return err
-				}
-				// 如果得到的相对路径是"."，则说明可以直接使用文件名
-				if rel == "." {
-					rel = walkInfo.FileInfo.Name()
-				}
-				fileHeader.Name = rel
-			}
-			// 指定压缩算法
-			fileHeader.Method = zip.Deflate
-
-			srcFileReader, err := OpenFileReader(walkInfo.WalkPath)
-			if err != nil {
-				return err
-			}
-			defer srcFileReader.Close()
-
-			// 压缩文件
-			if err := ziper(zipWriter, fileHeader, srcFileReader); err != nil {
-				return err
-			}
+		// 创建压缩文件信息头
+		fileHeader, err := zip.FileInfoHeader(walkInfo.WalkFileInfo)
+		if err != nil {
+			return nil, err
 		}
-		return nil
+		// 指定压缩算法
+		fileHeader.Method = zip.Deflate
+
+		rel, err := filepath.Rel(walkInfo.SrcPath, walkInfo.WalkPath)
+		if err != nil {
+			return nil, err
+		}
+		// 如果得到的相对路径是"."，则说明可以直接使用文件名
+		if rel == "." && !walkInfo.WalkFileInfo.IsDir() {
+			rel = walkInfo.WalkFileInfo.Name()
+		}
+		fileHeader.Name = rel
+
+		if !walkInfo.WalkFileInfo.IsDir() {
+			if !walkInfo.WalkFileInfo.Mode().IsRegular() {
+				return nil, NotRegularFile
+			}
+		} else if fileHeader.Name == "." {
+			fileHeader.Name = "/"
+		} else {
+			fileHeader.Name += "/"
+		}
+
+		return fileHeader, nil
+	}
+}
+
+// OutLayerWalker 也只会保留相对SrcPath的文件结构，但是相较于 RelZipWalker，
+// 它还会尽量保留 path.Base(walkInfo.SrcPath)返回的最内层目录
+// 用于向已存在的压缩文件添加新的文件或目录
+func OutLayerWalker() ZipWalker {
+	return func(walkInfo *ZipWalkInfo, zipWriter *zip.Writer, zipFn Ziper) (*zip.FileHeader, error) {
+		if walkInfo.Err != nil {
+			return nil, walkInfo.Err
+		}
+
+		if !walkInfo.WalkFileInfo.IsDir() && walkInfo.WalkFileInfo.Mode().IsRegular() {
+			return nil, NotRegularFile
+		}
+
+		// 创建压缩文件信息头
+		fileHeader, err := zip.FileInfoHeader(walkInfo.WalkFileInfo)
+		if err != nil {
+			return nil, err
+		}
+		// 指定压缩算法
+		fileHeader.Method = zip.Deflate
+
+		// 如果append的是一个目录
+		if walkInfo.SrcFileInfo.IsDir() {
+			base := path.Base(walkInfo.SrcPath)
+			if base == "." || base == "" {
+				base = "/"
+			}
+			rel, err := filepath.Rel(walkInfo.SrcPath, walkInfo.WalkPath)
+			if err != nil {
+				return nil, err
+			}
+			fileHeader.Name = path.Join(base, rel)
+		} else { // 如果是一个文件的话直接将header设置为文件名
+			_, file := path.Split(walkInfo.WalkPath)
+			fileHeader.Name = file
+		}
+
+		return fileHeader, nil
 	}
 }
 
@@ -148,7 +209,7 @@ func AppendToZipWith(walker ZipWalker, ziper Ziper, zipPath string, sources ...s
 		if err != nil {
 			return err
 		}
-		err = ziper(zipWriter, fileHeader, fileReader)
+		err = ziper(zipWriter, fileHeader, fileReader, zipFile.FileInfo())
 		fileReader.Close()
 		if err != nil {
 			return err
@@ -188,40 +249,41 @@ func AppendToZipWith(walker ZipWalker, ziper Ziper, zipPath string, sources ...s
 // return error
 // 压缩指定路径的文件或目录创建到zip压缩文件
 func zipArchive(writer *zip.Writer, src string, walker ZipWalker, ziper Ziper) error {
-	return filepath.Walk(src, func(walkPath string, info fs.FileInfo, err error) error {
-		return walker(&ZipWalkInfo{
-			Src:      src,
-			WalkPath: walkPath,
-			FileInfo: info,
-			Err:      err,
-		}, writer, ziper)
-	})
-}
-
-// Unzip
-// param src string
-// param dest string
-// return error
-// 解压zip文件
-func Unzip(src, dest string) error {
-	zipReader, err := zip.OpenReader(src)
+	stat, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
-	defer zipReader.Close()
-	return unzip(zipReader, dest)
+	return filepath.Walk(src, func(walkPath string, info fs.FileInfo, err error) error {
+		fileHeader, err := walker(&ZipWalkInfo{
+			SrcPath:      src,
+			WalkPath:     walkPath,
+			SrcFileInfo:  stat,
+			WalkFileInfo: info,
+			Err:          err,
+		}, writer, ziper)
+		if err != nil {
+			return err
+		}
+
+		fileReader, err := OpenFileReader(walkPath)
+		if err != nil {
+			return err
+		}
+		defer fileReader.Close()
+
+		return ziper(writer, fileHeader, fileReader, info)
+	})
 }
 
 func unzip(zipReader *zip.ReadCloser, dest string) error {
 	for _, zipFile := range zipReader.File {
+		unzipPath := path.Join(dest, zipFile.Name)
 		if !zipFile.FileInfo().IsDir() {
 			// 打开压缩文件，准备读取
 			reader, err := zipFile.Open()
 			if err != nil {
 				return err
 			}
-
-			unzipPath := path.Join(dest, zipFile.Name)
 
 			if err := MkdirAll(path.Dir(unzipPath)); err != nil {
 				return err
@@ -236,6 +298,10 @@ func unzip(zipReader *zip.ReadCloser, dest string) error {
 			_, err = io.CopyBuffer(writer, reader, DefaultBuffer)
 
 			if err := errors.Join(err, writer.Close(), reader.Close()); err != nil {
+				return err
+			}
+		} else {
+			if err := MkdirAll(unzipPath); err != nil {
 				return err
 			}
 		}
