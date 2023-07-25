@@ -30,3 +30,12 @@ func TestUnzip(t *testing.T) {
 	fmt.Println(filebox.Unzip("/test/log.zip", "/test/unzip/"))
 	fmt.Println(filebox.Unzip("/test/log.zip", "./unzip/"))
 }
+
+func TestTgz(t *testing.T) {
+	fmt.Println(filebox.TarGzip("/test/unzip", "/test/unzip.tar.gz"))
+	fmt.Println(filebox.AppendToTarGzip("/test/unzip.tar.gz", "/test/aaa.txt"))
+}
+
+func TestUnTgz(t *testing.T) {
+	fmt.Println(filebox.UnTarGzip("/test/unzip.tgz", "/test/tar/"))
+}

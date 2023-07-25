@@ -10,6 +10,14 @@ import (
 	"path/filepath"
 )
 
+type WalkInfo struct {
+	SrcPath      string
+	WalkPath     string
+	SrcFileInfo  fs.FileInfo
+	WalkFileInfo fs.FileInfo
+	Err          error
+}
+
 var (
 	NotRegularFile = errors.New("not regular file")
 )
@@ -46,14 +54,6 @@ func Unzip(src, dest string) error {
 	return unzip(zipReader, dest)
 }
 
-type ZipWalkInfo struct {
-	SrcPath      string
-	WalkPath     string
-	SrcFileInfo  fs.FileInfo
-	WalkFileInfo fs.FileInfo
-	Err          error
-}
-
 // Ziper 决定了用何种方式将源文件的内容写入到压缩文件中
 type Ziper func(zipWriter *zip.Writer, fileHeader *zip.FileHeader, fileReader io.Reader, fileInfo fs.FileInfo) error
 
@@ -77,11 +77,11 @@ func ZipHeader() Ziper {
 // ZipWalker 决定了用何种方式如何处理压缩信息
 // 压缩时，会对输入路径执行 filepath.Walk，walkerFn会在每一次walk时调用
 // 通过walker可以自定义压缩方式
-type ZipWalker func(walkInfo *ZipWalkInfo, zipWriter *zip.Writer, zipFn Ziper) (*zip.FileHeader, error)
+type ZipWalker func(walkInfo WalkInfo, zipWriter *zip.Writer) (*zip.FileHeader, error)
 
 // RelZipWalker 只会保留相对SrcPath的文件结构，用于直接压缩文件或目录
 func RelZipWalker() ZipWalker {
-	return func(walkInfo *ZipWalkInfo, zipWriter *zip.Writer, zipFn Ziper) (*zip.FileHeader, error) {
+	return func(walkInfo WalkInfo, zipWriter *zip.Writer) (*zip.FileHeader, error) {
 		if walkInfo.Err != nil {
 			return nil, walkInfo.Err
 		}
@@ -122,7 +122,7 @@ func RelZipWalker() ZipWalker {
 // 它还会尽量保留 path.Base(walkInfo.SrcPath)返回的最内层目录
 // 用于向已存在的压缩文件添加新的文件或目录
 func OutLayerWalker() ZipWalker {
-	return func(walkInfo *ZipWalkInfo, zipWriter *zip.Writer, zipFn Ziper) (*zip.FileHeader, error) {
+	return func(walkInfo WalkInfo, zipWriter *zip.Writer) (*zip.FileHeader, error) {
 		if walkInfo.Err != nil {
 			return nil, walkInfo.Err
 		}
@@ -173,7 +173,7 @@ func ZipWith(src, dest string, walker ZipWalker, ziper Ziper) error {
 	}
 	writer := zip.NewWriter(zipFile)
 	defer writer.Close()
-	return zipArchive(writer, src, walker, ziper)
+	return zipWalk(writer, src, walker, ziper)
 }
 
 // AppendToZipWith
@@ -218,7 +218,7 @@ func AppendToZipWith(walker ZipWalker, ziper Ziper, zipPath string, sources ...s
 
 	// 将新的待压缩文件写入临时zip中
 	for _, src := range sources {
-		if err := zipArchive(zipWriter, src, walker, ziper); err != nil {
+		if err := zipWalk(zipWriter, src, walker, ziper); err != nil {
 			return err
 		}
 	}
@@ -242,25 +242,25 @@ func AppendToZipWith(walker ZipWalker, ziper Ziper, zipPath string, sources ...s
 	return rm()
 }
 
-// zipArchive
+// zipWalk
 // param writer *zip.Writer
 // param src string 目标路径
 // param rel bool 如果为true，压缩时，仅保留相对文件结构
 // return error
 // 压缩指定路径的文件或目录创建到zip压缩文件
-func zipArchive(writer *zip.Writer, src string, walker ZipWalker, ziper Ziper) error {
+func zipWalk(writer *zip.Writer, src string, walker ZipWalker, ziper Ziper) error {
 	stat, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
 	return filepath.Walk(src, func(walkPath string, info fs.FileInfo, err error) error {
-		fileHeader, err := walker(&ZipWalkInfo{
+		fileHeader, err := walker(WalkInfo{
 			SrcPath:      src,
 			WalkPath:     walkPath,
 			SrcFileInfo:  stat,
 			WalkFileInfo: info,
 			Err:          err,
-		}, writer, ziper)
+		}, writer)
 		if err != nil {
 			return err
 		}
