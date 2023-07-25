@@ -9,6 +9,11 @@ import (
 	"path"
 )
 
+var (
+	WriteFlag  = os.O_CREATE | os.O_WRONLY | os.O_TRUNC
+	AppendFlag = os.O_CREATE | os.O_WRONLY | os.O_APPEND
+)
+
 func OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 	return os.OpenFile(name, flag, perm)
 }
@@ -37,6 +42,16 @@ func OpenFileRw(file string) (*os.File, error) {
 // return error
 // 创建一个指定名称的文件，并且会检查文件的父目录是否存在
 func CreateFile(file string) (*os.File, error) {
+	return CreateFileMode(file, 0666)
+}
+
+// CreateFileMode
+// param file string
+// param mode os.FileMode
+// return *os.File
+// return error
+// 创建一个指定名称和mode的文件，并且会检查文件的父目录是否存在
+func CreateFileMode(file string, mode os.FileMode) (*os.File, error) {
 	dir := path.Dir(file)
 	// 检查父目录是否存在
 	if dir != "." && !IsExist(dir) {
@@ -44,7 +59,7 @@ func CreateFile(file string) (*os.File, error) {
 			return nil, err
 		}
 	}
-	return os.Create(file)
+	return OpenFile(file, WriteFlag, mode)
 }
 
 // CreateTempFile
@@ -61,10 +76,7 @@ func CreateTempFile(dir, pattern string) (file *os.File, rm func() error, err er
 		}
 		return err
 	}
-	if err != nil {
-		return tempFile, rm, err
-	}
-	return tempFile, rm, nil
+	return tempFile, rm, err
 }
 
 // IsExist
@@ -79,6 +91,22 @@ func IsExist(file string) bool {
 		return false
 	}
 	return true
+}
+
+// IsLink
+// param file string
+// return bool
+// 判断一个指定路径的目标是不是符号链接
+func IsLink(file string) bool {
+	lstat, err := os.Lstat(file)
+	if err != nil {
+		return false
+	}
+	return isLink(lstat)
+}
+
+func isLink(info os.FileInfo) bool {
+	return info.Mode()&os.ModeSymlink != 0
 }
 
 // ReadFileBytes

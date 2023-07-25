@@ -1,15 +1,12 @@
 # filebox
+
 一个简单的文件操作工具库，封装了常用的文件操作。
 
-
-
-##  安装
+## 安装
 
 ```sh
 $ go get github.com/dstgo/filebox
 ```
-
-
 
 ## 压缩操作
 
@@ -18,30 +15,35 @@ $ go get github.com/dstgo/filebox
     ```go
     func Zip(src, dest string) error
     ```
-    
+
 * **AppendToZip** 将额外的文件或目录添加到已有的zip压缩文件中
 
     ```go
     func AppendToZip(zipPath string, sources ...string) error
     ```
-    
+
 * **UnZip** 解压zip压缩格式的压缩包
 
     ```go
     func Unzip(src, dest string) error
     ```
 
-* **Tar** 以tar格式压缩指定文件或目录
+* **TarGzip** 以tar格式压缩指定文件或目录
 
     ```go
     func Tar(src, dest string) error
     ```
 
-* **UnTar** 解压tar压缩格式的压缩包
+* **AppendToTarGzip** 向已存在的Tgz压缩文件添加新的文件或目录
+  ```go
+  func AppendToTarGzip(tgz string, sources ...string) error
+  ```
+* **UnTarGzip** 解压tar压缩格式的压缩包
 
     ```go
     func UnTar(src, dest string) error
     ```
+
 ## 路径操作
 
 - **GetCurrentRunningPath** 获取当前程序运行的绝对路径
@@ -55,8 +57,6 @@ $ go get github.com/dstgo/filebox
     ```go
     func GetCurrentCallerPath() string
     ```
-
-    
 
 ## 文件操作
 
@@ -120,6 +120,24 @@ $ go get github.com/dstgo/filebox
 
     ```go
     func MkdirAll(dirs ...string) error
+    ```
+
+- **MkdirTemp** 创建一个临时文件，并返回一个函数以删除这个临时文件
+
+    ```go
+    func MkdirTemp(dir string, pattern string) (string, func() error, error)
+    ```
+
+- **ReadDirFullNames** 读取一个路径下的所有文件和目录，返回它们的完整路径
+
+    ```go
+    func ReadDirFullNames(dir string) []string
+    ```
+
+- **ReadDirShortNames** 读取一个路径下的所有文件和目录，返回它们的简短名称
+
+    ```go
+    func ReadDirShortNames(dir string) []string
     ```
 
     
