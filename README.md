@@ -58,6 +58,10 @@ $ go get github.com/dstgo/filebox
     func GetCurrentCallerPath() string
     ```
 
+## 文件状态
+
+
+
 ## 文件操作
 
 - **IsExist** 判断一个文件或目录是否存在
@@ -181,3 +185,4 @@ $ go get github.com/dstgo/filebox
     ```
     
 
+## 哈希操作

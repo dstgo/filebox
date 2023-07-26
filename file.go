@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"time"
 )
 
 var (
@@ -80,63 +79,6 @@ func CreateTempFile(dir, pattern string) (file *os.File, rm func() error, err er
 	return tempFile, rm, err
 }
 
-// IsExist
-// param file string
-// return bool
-// 判断一个文件或目录是否存在
-func IsExist(file string) bool {
-	_, err := os.Stat(file)
-	if errors.Is(err, os.ErrNotExist) {
-		return false
-	} else if err != nil {
-		return false
-	}
-	return true
-}
-
-// FileSize
-// param file string
-// return int64
-// 获取一个文件的大小
-func FileSize(file string) int64 {
-	stat, err := os.Stat(file)
-	if err != nil {
-		return 0
-	}
-	if stat.Mode().IsRegular() {
-		return stat.Size()
-	}
-	return 0
-}
-
-// MTime
-// param file string
-// return time.Time
-// 获取指定路径的文件或目录的修改时间
-func MTime(file string) time.Time {
-	stat, err := os.Stat(file)
-	if err != nil {
-		return time.Time{}
-	}
-	return stat.ModTime()
-}
-
-// IsLink
-// param file string
-// return bool
-// 判断一个指定路径的目标是不是符号链接
-func IsLink(file string) bool {
-	lstat, err := os.Lstat(file)
-	if err != nil {
-		return false
-	}
-	return isLink(lstat)
-}
-
-func isLink(info os.FileInfo) bool {
-	return info.Mode()&os.ModeSymlink != 0
-}
-
 // ReadFileBytes
 // param file string
 // return []byte
@@ -166,7 +108,7 @@ type NextLine = func() ([]byte, error)
 // param file string
 // return []string
 // return error
-// 成功打开文件后，返回一个next函数，用于按行读取文件内容
+// 成功打开文件后，返回一个迭代器，用于按行读取文件内容
 func ReadFileLine(file string) (NextLine, error) {
 	f, err := OpenFileReader(file)
 	if err != nil {
