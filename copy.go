@@ -68,6 +68,13 @@ func (s *OsFs) Open(name string) (fs.File, error) {
 	return os.Open(name)
 }
 
+// CopyFsDir 指定fs，缓冲区大小，将源地址的文件复制到目标地址
+// param srcFS ReadFs
+// param dstFs WriteFs
+// param src string
+// param dst string
+// param buffer []byte
+// return error
 func CopyFsDir(srcFS ReadFs, dstFs WriteFs, src, dst string, buffer []byte) error {
 	dir, err := srcFS.ReadDir(src)
 	if err != nil {
@@ -93,6 +100,13 @@ func CopyFsDir(srcFS ReadFs, dstFs WriteFs, src, dst string, buffer []byte) erro
 	return nil
 }
 
+// CopyFsFile 指定fs，缓冲区大小，将源地址的文件复制到目标地址
+// param srcFs ReadFs
+// param dstFs WriteFs
+// param src string
+// param dst string
+// param buffer []byte
+// return error
 func CopyFsFile(srcFs ReadFs, dstFs WriteFs, src, dst string, buffer []byte) error {
 	srcFile, err := srcFs.Open(src)
 	if err != nil {
@@ -131,10 +145,20 @@ func CopyFile(src, dst string) error {
 	return CopyFileBuf(src, dst, DefaultBuffer)
 }
 
+// CopyDirBuf 指定缓冲区大小，复制目录
+// param src string
+// param dst string
+// param buf []byte
+// return error
 func CopyDirBuf(src, dst string, buf []byte) error {
 	return CopyFsDir(Os, Os, src, dst, buf)
 }
 
+// CopyFileBuf 指定缓冲区大小，复制文件
+// param src string
+// param dst string
+// param buf []byte
+// return error
 func CopyFileBuf(src, dst string, buf []byte) error {
 	return CopyFsFile(Os, Os, src, dst, buf)
 }
