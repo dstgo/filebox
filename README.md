@@ -60,6 +60,30 @@ $ go get github.com/dstgo/filebox
 
 ## 文件操作
 
+- **IsExist** 判断一个文件或目录是否存在
+
+    ```go
+    func IsExist(file string) bool
+    ```
+    
+- **IsLink** 判断一个是否是一个符号连接
+
+    ```go
+    func IsLink(file string) bool
+    ```
+
+- **FileSize** 获取一个文件的大小，单位为字节
+
+    ```go
+    func FileSize(file string) int64
+    ```
+
+- **MTime** 获取一个文件或目录的最后修改时间
+
+    ```go
+    func MTime(file string) time.Time
+    ```
+
 - **CreateFile** 检查文件的父目录是否存在，并创建文件
 
     ```go
@@ -84,16 +108,10 @@ $ go get github.com/dstgo/filebox
     func CreateTempFile(dir, pattern string) (file *os.File, rm func() error, err error)
     ```
 - **ClearFile** 清空文件内容
-    
+  
   ```go
   func ClearFile(path string) error 
   ```
-
-- **IsExist** 判断一个文件或目录是否存在
-
-    ```go
-    func IsExist(file string) bool
-    ```
 
 - **ReadFileBytes**  将文件内容读取为字节切片
 
@@ -106,7 +124,7 @@ $ go get github.com/dstgo/filebox
     ```go
     func ReadFileString(file string) (string, error)
     ```
-- **ReadFileLine** 按行读取文件内容
+- **ReadFileLine** 按行读取文件内容，返回迭代器
 
     ```go
     func ReadFileLine(file string) (NextLine, error) 

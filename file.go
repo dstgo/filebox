@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"time"
 )
 
 var (
@@ -91,6 +92,33 @@ func IsExist(file string) bool {
 		return false
 	}
 	return true
+}
+
+// FileSize
+// param file string
+// return int64
+// 获取一个文件的大小
+func FileSize(file string) int64 {
+	stat, err := os.Stat(file)
+	if err != nil {
+		return 0
+	}
+	if stat.Mode().IsRegular() {
+		return stat.Size()
+	}
+	return 0
+}
+
+// MTime
+// param file string
+// return time.Time
+// 获取指定路径的文件或目录的修改时间
+func MTime(file string) time.Time {
+	stat, err := os.Stat(file)
+	if err != nil {
+		return time.Time{}
+	}
+	return stat.ModTime()
 }
 
 // IsLink
