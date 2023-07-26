@@ -2,7 +2,6 @@ package filebox
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path"
 )
@@ -46,27 +45,9 @@ func ClearFile(path string) error {
 	if err != nil {
 		return err
 	}
-	defer func(file *os.File) {
-		err := CloseFile(file)
-		if err != nil {
-			fmt.Println(err)
-		}
-	}(file)
+	defer file.Close()
 	if err = file.Truncate(0); err != nil {
 		return err
-	}
-	return nil
-}
-
-// CloseFile 关闭文件并处理任何可能出现的错误
-func CloseFile(file *os.File) error {
-	if file == nil {
-		return nil
-	}
-	if err := file.Close(); err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
 	}
 	return nil
 }

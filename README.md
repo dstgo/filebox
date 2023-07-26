@@ -98,15 +98,10 @@ $ go get github.com/dstgo/filebox
     func IsDir(path string) bool
     ```
 
-- **ListDirNames** 返回所有目录名
+- **ListFileNames** 返回指定目录下指定类型的文件名
 
     ```go
-    func ListDirNames(dirPath string) []string 
-    ```
-- **ListFileNames** 返回所有文件名
-
-    ```go
-    func ListDirNames(dirPath string) []string 
+    func ListFileNames(dirPath string, fileType FileType) []string
     ```
     
 

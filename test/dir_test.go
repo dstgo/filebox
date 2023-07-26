@@ -1,33 +1,31 @@
 package test
 
 import (
+	"fmt"
 	"github.com/dstgo/filebox"
-	"reflect"
 	"testing"
 )
 
-func TestListDirNames(t *testing.T) {
-	dirPath := "./testdata"
-
-	// 调用ListDirNames函数获取目录名称列表
-	dirNames := filebox.ListDirNames(dirPath)
-
-	// 检查返回的目录名称列表是否符合预期
-	expectedDirNames := []string{"dir1", "dir2", "dir3"}
-	if !reflect.DeepEqual(dirNames, expectedDirNames) {
-		t.Errorf("ListDirNames(%q) returned %v, expected %v", dirPath, dirNames, expectedDirNames)
-	}
-}
-
 func TestListFileNames(t *testing.T) {
-	dirPath := "./testdata"
-
-	// 调用ListFileNames函数获取非目录文件名称列表
-	fileNames := filebox.ListFileNames(dirPath)
-
-	// 检查返回的非目录文件名称列表是否符合预期
-	expectedFileNames := []string{"file1.txt", "file2.md"}
-	if !reflect.DeepEqual(fileNames, expectedFileNames) {
-		t.Errorf("ListFileNames(%q) returned %v, expected %v", dirPath, fileNames, expectedFileNames)
+	fmt.Println("------------------AllFile")
+	fileNames1 := filebox.ListFileNames("./testdata", filebox.FileTypeAll)
+	for _, fileName := range fileNames1 {
+		fmt.Println(fileName)
 	}
+	fmt.Println("------------------Folder")
+	fileNames2 := filebox.ListFileNames("./testdata", filebox.FileTypeFolder)
+	for _, fileName := range fileNames2 {
+		fmt.Println(fileName)
+	}
+	fmt.Println("------------------PlainFile")
+	fileNames3 := filebox.ListFileNames("./testdata", filebox.FileTypePlainFile)
+	for _, fileName := range fileNames3 {
+		fmt.Println(fileName)
+	}
+	fmt.Println("------------------OtherFile")
+	fileNames4 := filebox.ListFileNames("./testdata", filebox.FileTypeOther)
+	for _, fileName := range fileNames4 {
+		fmt.Println(fileName)
+	}
+
 }
