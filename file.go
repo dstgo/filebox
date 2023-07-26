@@ -176,3 +176,19 @@ func ReadFileLines(file string) ([]string, error) {
 		bufline.Reset()
 	}
 }
+
+// ClearFile 清空一个文件
+func ClearFile(path string) error {
+	if IsDir(path) {
+		return errors.New("the path file is not a single file")
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if err = file.Truncate(0); err != nil {
+		return err
+	}
+	return nil
+}

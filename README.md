@@ -83,6 +83,11 @@ $ go get github.com/dstgo/filebox
     ```go
     func CreateTempFile(dir, pattern string) (file *os.File, rm func() error, err error)
     ```
+- **ClearFile** 清空文件内容
+    
+  ```go
+  func ClearFile(path string) error 
+  ```
 
 - **IsExist** 判断一个文件或目录是否存在
 
@@ -140,5 +145,16 @@ $ go get github.com/dstgo/filebox
     func ReadDirShortNames(dir string) []string
     ```
 
+- **IsDir** 判断是否是目录
+
+    ```go
+    func IsDir(path string) bool
+    ```
+
+- **ListFileNames** 返回指定目录下指定类型的文件名
+
+    ```go
+    func ListFileNames(dirPath string, fileType FileType) []string
+    ```
     
 
