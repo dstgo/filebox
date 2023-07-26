@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"github.com/dstgo/filebox"
+	"log"
 	"os"
 	"testing"
 )
@@ -53,4 +54,13 @@ func TestClearFile(t *testing.T) {
 	if len(fileContent) != 0 {
 		t.Errorf("File was not cleared")
 	}
+}
+
+func TestReadLines(t *testing.T) {
+	lines, err := filebox.ReadFileLines("./testdata/line.txt")
+	if err != nil {
+		log.Panicln(err)
+	}
+	log.Println(len(lines))
+	log.Println(lines)
 }

@@ -106,7 +106,12 @@ $ go get github.com/dstgo/filebox
     ```go
     func ReadFileString(file string) (string, error)
     ```
+- **ReadFileLine** 按行读取文件内容
 
+    ```go
+    func ReadFileLine(file string) (NextLine, error) 
+    ```
+  
 - **ReadFileLines** 按行读取文件内容，收集成一个字符串切片
 
     ```go

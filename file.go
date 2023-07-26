@@ -129,37 +129,34 @@ func ReadFileString(file string) (string, error) {
 		return "", err
 	}
 	return string(bc), nil
+
 }
 
-// ReadFileLines
+type NextLine = func() ([]byte, error)
+
+// ReadFileLine
 // param file string
 // return []string
 // return error
-// 按行读取文件内容
-func ReadFileLines(file string) ([]string, error) {
-
-	f, err := os.Open(file)
-	defer f.Close()
+// 成功打开文件后，返回一个next函数，用于按行读取文件内容
+func ReadFileLine(file string) (NextLine, error) {
+	f, err := OpenFileReader(file)
 	if err != nil {
 		return nil, err
 	}
 
 	reader := bufio.NewReader(f)
-
-	lines := make([]string, 0, reader.Size()/30)
 	// 行缓冲
 	bufline := bytes.NewBuffer(make([]byte, 0, 4096))
 
-	for {
+	return func() ([]byte, error) {
 		// 如果当前行大于缓冲区，一次读不完，则尝试多次读取，直到读取完毕
+		// defaultBufSize = 4096
 		for {
 			line, prefix, err := reader.ReadLine()
 			if err != nil {
-				// 文件读完了
-				if errors.Is(err, io.EOF) {
-					return lines, nil
-				}
-				return nil, err
+				f.Close()
+				return bufline.Bytes(), err
 			}
 			// 将读取到的当前行内容写入缓冲
 			if _, err := bufline.Write(line); err != nil {
@@ -171,9 +168,33 @@ func ReadFileLines(file string) ([]string, error) {
 				break
 			}
 		}
+		defer bufline.Reset()
+		return bufline.Bytes(), nil
+	}, nil
+}
 
-		lines = append(lines, bufline.String())
-		bufline.Reset()
+// ReadFileLines
+// param file string
+// return []string
+// return error
+// 一次性读完文件的所有内容，并返回字符串切片
+// 如果不想一次性读完全部内容，可以使用 ReadFileLine
+func ReadFileLines(file string) ([]string, error) {
+	nextLine, err := ReadFileLine(file)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := make([]string, 0, 64)
+	for {
+		line, err := nextLine()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				err = nil
+			}
+			return lines, err
+		}
+		lines = append(lines, string(line))
 	}
 }
 
