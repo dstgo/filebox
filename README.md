@@ -1,6 +1,12 @@
 # filebox
 
-a simple file dev tool pkg
+a simple file dev tool pkg, supported features as follows:
+    
+- compress, uncompress
+- crc sum
+- hash sum
+- files, dir copy
+- file helper
 
 ## install
 
