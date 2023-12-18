@@ -6,174 +6,159 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 )
 
-var (
-	WriteFlag  = os.O_CREATE | os.O_WRONLY | os.O_TRUNC
-	AppendFlag = os.O_CREATE | os.O_WRONLY | os.O_APPEND
-)
-
-func OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	return os.OpenFile(name, flag, perm)
-}
-
-func OpenFileReader(file string) (*os.File, error) {
-	return OpenFile(file, os.O_RDONLY, 0)
-}
-
-func OpenFileWriter(file string) (*os.File, error) {
-	if file, err := CreateFile(file); err != nil {
-		return file, err
+// Mkdir creates a directory, create parent-directory first if parent-directory does not exist.
+func Mkdir(dir string) error {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
 	}
-	return OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	return nil
 }
 
-func OpenFileRw(file string) (*os.File, error) {
-	if file, err := CreateFile(file); err != nil {
-		return file, err
+// IsExist checks if the given path exists
+func IsExist(name string) bool {
+	_, err := os.Stat(name)
+	if err != nil {
+		return false
 	}
-	return OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	return !os.IsNotExist(err)
 }
 
-// CreateFile
-// param file string
-// return *os.File
-// return error
-// 创建一个指定名称的文件，并且会检查文件的父目录是否存在
-func CreateFile(file string) (*os.File, error) {
-	return CreateFileMode(file, 0666)
+// IsDir checks if the given path is a directory
+func IsDir(name string) bool {
+	stat, err := os.Stat(name)
+	if err != nil {
+		return false
+	}
+	return stat.IsDir()
 }
 
-// CreateFileMode
-// param file string
-// param mode os.FileMode
-// return *os.File
-// return error
-// 创建一个指定名称和mode的文件，并且会检查文件的父目录是否存在
-func CreateFileMode(file string, mode os.FileMode) (*os.File, error) {
-	dir := path.Dir(file)
-	// 检查父目录是否存在
-	if dir != "." && !IsExist(dir) {
-		if err := MkdirAll(dir); err != nil {
+// CreateFile creates a new file, create parent-directory first if parent-directory does not exist,
+// then create the specified file.
+func CreateFile(filename string) (*os.File, error) {
+	return OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+}
+
+// OpenFile open a new file, create parent-directory first if parent-directory does not exist,
+// then open the specified file.
+func OpenFile(filename string, flag int, perm os.FileMode) (*os.File, error) {
+	dir := filepath.Dir(filename)
+	if dir != "." {
+		if err := Mkdir(dir); err != nil {
 			return nil, err
 		}
 	}
-	return OpenFile(file, WriteFlag, mode)
-}
-
-// CreateTempFile
-// param dir string
-// param pattern string
-// return rm func() error 删除临时文件
-// return err error
-// 创建一个临时文件，并返回一个函数以删除这个临时文件
-func CreateTempFile(dir, pattern string) (file *os.File, rm func() error, err error) {
-	tempFile, err := os.CreateTemp(dir, pattern)
-	rm = func() error {
-		if err == nil {
-			return os.Remove(tempFile.Name())
-		}
-		return err
-	}
-	return tempFile, rm, err
-}
-
-// ReadFileBytes
-// param file string
-// return []byte
-// return error
-// 从文件里面读取字节切片
-func ReadFileBytes(file string) ([]byte, error) {
-	return os.ReadFile(file)
-}
-
-// ReadFileString
-// param file string
-// return string
-// return error
-// 从文件里面读取字符串
-func ReadFileString(file string) (string, error) {
-	bc, err := ReadFileBytes(file)
-	if err != nil {
-		return "", err
-	}
-	return string(bc), nil
-
-}
-
-type NextLine = func() ([]byte, error)
-
-// ReadFileLine
-// param file string
-// return []string
-// return error
-// 成功打开文件后，返回一个迭代器，用于按行读取文件内容
-func ReadFileLine(file string) (NextLine, error) {
-	f, err := OpenFileReader(file)
+	file, err := os.OpenFile(filename, flag, perm)
 	if err != nil {
 		return nil, err
 	}
+	return file, nil
+}
 
-	reader := bufio.NewReader(f)
-	// 行缓冲
-	bufline := bytes.NewBuffer(make([]byte, 0, 4096))
+// TempDir creates a temporary directory, and returns a cleanup function to clean up temporary dir
+func TempDir(dir string) (temp string, cleanup func() error, err error) {
+	tmpDir := filepath.Join(os.TempDir(), dir)
+	if err := Mkdir(tmpDir); err != nil {
+		return "", nil, err
+	}
+	return tmpDir, func() error {
+		return os.RemoveAll(tmpDir)
+	}, nil
+}
+
+// TempFile creates a temporary file, and returns a cleanup function to clean up temporary file
+func TempFile(dir, pattern string) (temp *os.File, cleanup func() error, err error) {
+	tempFile, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return nil, nil, err
+	}
+	return tempFile, func() error {
+		_ = tempFile.Close()
+		return os.Remove(tempFile.Name())
+	}, nil
+}
+
+// ReadLine returns an iterator that iterate over per line of the given file.
+func ReadLine(file string) (next func() ([]byte, error), cleanup func() error, err error) {
+	fd, err := os.Open(file)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	reader := bufio.NewReaderSize(fd, 8192)
+	lineBuf := bytes.NewBuffer(make([]byte, 8192))
 
 	return func() ([]byte, error) {
-		// 如果当前行大于缓冲区，一次读不完，则尝试多次读取，直到读取完毕
-		// defaultBufSize = 4096
+		defer lineBuf.Reset()
 		for {
 			line, prefix, err := reader.ReadLine()
 			if err != nil {
-				f.Close()
-				return bufline.Bytes(), err
+				if errors.Is(err, io.EOF) {
+					return lineBuf.Bytes(), nil
+				}
+				return nil, err
 			}
 			// 将读取到的当前行内容写入缓冲
-			if _, err := bufline.Write(line); err != nil {
+			if _, err := lineBuf.Write(line); err != nil {
 				return nil, err
 			}
 
-			// 当前行读取完毕就退出循环
+			// if this line is too long to read once a time, keep reading until finished.
 			if !prefix {
 				break
 			}
 		}
-		defer bufline.Reset()
-		return bufline.Bytes(), nil
-	}, nil
+		return lineBuf.Bytes(), nil
+	}, fd.Close, nil
 }
 
-// ReadFileLines
-// param file string
-// return []string
-// return error
-// 一次性读完文件的所有内容，并返回字符串切片
-// 如果不想一次性读完全部内容，可以使用 ReadFileLine
-func ReadFileLines(file string) ([]string, error) {
-	nextLine, err := ReadFileLine(file)
+// ReadLines returns a slice of bytes of file contents split by line.
+func ReadLines(file string) ([][]byte, error) {
+	next, cleanup, err := ReadLine(file)
 	if err != nil {
 		return nil, err
 	}
+	defer cleanup()
 
-	lines := make([]string, 0, 64)
+	lines := make([][]byte, 0, 128)
 	for {
-		line, err := nextLine()
+		line, err := next()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				err = nil
 			}
 			return lines, err
 		}
-		lines = append(lines, string(line))
+		lines = append(lines, line)
 	}
 }
 
-// ClearFile 清空一个文件
-func ClearFile(path string) error {
-	if IsDir(path) {
-		return errors.New("the path file is not a single file")
+// ReadStringLines return a slice of strings of file contents split by line.
+func ReadStringLines(filename string) ([]string, error) {
+	next, cleanup, err := ReadLine(filename)
+	if err != nil {
+		return nil, err
 	}
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0666)
+	defer cleanup()
+
+	lines := make([]string, 0, 128)
+	for {
+		line, err := next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				err = nil
+			}
+			return lines, err
+		}
+		lines = append(lines, BytesToString(line))
+	}
+}
+
+// Truncate truncates the specified file
+func Truncate(filename string) error {
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
