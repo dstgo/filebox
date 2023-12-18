@@ -4,161 +4,54 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
+	"path/filepath"
 )
 
-var (
-	// DefaultBuffer 8KB
-	DefaultBuffer = make([]byte, 1024*1024*8)
-)
-
-type RwFile interface {
-	fs.File
-	io.ReadWriteCloser
+// Copy copies src to dest path, only copy dir and regular files.
+func Copy(src, dst string) error {
+	return CopyFs(os.DirFS(src), ".", dst)
 }
 
-type RwFs interface {
-	ReadFs
-	WriteFs
-}
-
-type ReadFs interface {
-	Open(name string) (fs.File, error)
-	ReadDir(name string) ([]fs.DirEntry, error)
-	ReadFile(name string) ([]byte, error)
-}
-
-type WriteFs interface {
-	Mkdir(name string) error
-	MkdirAll(name string) error
-	WriteFile(name string, data []byte) error
-	CreateFile(name string) (RwFile, error)
-}
-
-var Os = new(OsFs)
-
-type OsFs struct {
-}
-
-func (s *OsFs) CreateFile(name string) (RwFile, error) {
-	return CreateFile(name)
-}
-
-func (s *OsFs) Mkdir(name string) error {
-	return os.Mkdir(name, os.ModeDir)
-}
-
-func (s *OsFs) MkdirAll(name string) error {
-	return os.MkdirAll(name, os.ModeDir)
-}
-
-func (s *OsFs) WriteFile(name string, data []byte) error {
-	return os.WriteFile(name, data, os.ModePerm)
-}
-
-func (s *OsFs) ReadDir(name string) ([]fs.DirEntry, error) {
-	return os.ReadDir(name)
-}
-
-func (s *OsFs) ReadFile(name string) ([]byte, error) {
-	return os.ReadFile(name)
-}
-
-func (s *OsFs) Open(name string) (fs.File, error) {
-	return os.Open(name)
-}
-
-// CopyFsDir 指定fs，缓冲区大小，将源地址的文件复制到目标地址
-// param srcFS ReadFs
-// param dstFs WriteFs
-// param src string
-// param dst string
-// param buffer []byte
-// return error
-func CopyFsDir(srcFS ReadFs, dstFs WriteFs, src, dst string, buffer []byte) error {
-	dir, err := srcFS.ReadDir(src)
+// CopyFs copies the specified srcpath from srcFs to destpath in os fs, only copy dir and regular files.
+func CopyFs(srcFs fs.FS, srcpath, destpath string) error {
+	// check src stat
+	_, err := fs.Stat(srcFs, srcpath)
 	if err != nil {
-		return err
-	} else if err = dstFs.MkdirAll(dst); err != nil {
 		return err
 	}
 
-	for _, entry := range dir {
-		dstPath := path.Join(dst, entry.Name())
-		srcPath := path.Join(src, entry.Name())
-		var copyErr error
-		if entry.IsDir() {
-			copyErr = CopyFsDir(srcFS, dstFs, srcPath, dstPath, buffer)
+	return fs.WalkDir(srcFs, srcpath, func(name string, info fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		// destination path
+		destName := filepath.Join(destpath, name)
+
+		if info.Type().IsRegular() {
+			fileInfo, err := info.Info()
+			if err != nil {
+				return err
+			}
+			destfile, err := OpenFile(destName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fileInfo.Mode())
+			if err != nil {
+				return err
+			}
+			defer destfile.Close()
+			srcfile, err := srcFs.Open(name)
+			if err != nil {
+				return err
+			}
+			defer srcfile.Close()
+			// copy file contents
+			if _, err := io.Copy(destfile, srcfile); err != nil {
+				return err
+			}
+			return nil
+		} else if info.Type().IsRegular() {
+			return Mkdir(destName)
 		} else {
-			copyErr = CopyFsFile(srcFS, dstFs, srcPath, dstPath, buffer)
+			// ignore other types
+			return nil
 		}
-
-		if copyErr != nil {
-			return copyErr
-		}
-	}
-	return nil
-}
-
-// CopyFsFile 指定fs，缓冲区大小，将源地址的文件复制到目标地址
-// param srcFs ReadFs
-// param dstFs WriteFs
-// param src string
-// param dst string
-// param buffer []byte
-// return error
-func CopyFsFile(srcFs ReadFs, dstFs WriteFs, src, dst string, buffer []byte) error {
-	srcFile, err := srcFs.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-	dstFile, err := dstFs.CreateFile(dst)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
-
-	_, err = io.CopyBuffer(dstFile, srcFile, buffer)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// CopyDir
-// param src string 源路径
-// param dst string 目标路径
-// return error
-// 将源路径的目录复制到目标路径
-func CopyDir(src, dst string) error {
-	return CopyDirBuf(src, dst, DefaultBuffer)
-}
-
-// CopyFile
-// param src string
-// param dst string
-// return error
-// 将源路径的文件复制到目标路径
-func CopyFile(src, dst string) error {
-	return CopyFileBuf(src, dst, DefaultBuffer)
-}
-
-// CopyDirBuf 指定缓冲区大小，复制目录
-// param src string
-// param dst string
-// param buf []byte
-// return error
-func CopyDirBuf(src, dst string, buf []byte) error {
-	return CopyFsDir(Os, Os, src, dst, buf)
-}
-
-// CopyFileBuf 指定缓冲区大小，复制文件
-// param src string
-// param dst string
-// param buf []byte
-// return error
-func CopyFileBuf(src, dst string, buf []byte) error {
-	return CopyFsFile(Os, Os, src, dst, buf)
+	})
 }
